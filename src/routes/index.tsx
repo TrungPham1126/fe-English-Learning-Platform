@@ -1,28 +1,45 @@
 // src/routes/index.tsx
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter, Navigate, useParams } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
 
 // Layouts
+import AdminLessonDetailPage from "@/features/admin/pages/AdminLessonDetailPage";
 import PublicLayout from "@/components/layouts/PublicLayout";
 import StudentLayout from "@/components/layouts/StudentLayout";
 import TeacherLayout from "@/components/layouts/TeacherLayout";
+import AdminLayout from "@/components/layouts/AdminLayout";
 import ProtectedRoute from "@/routes/ProtectedRoute";
+import ClassroomDetailPage from "@/features/admin/pages/ClassroomDetailPage";
 
 // Phân hệ Auth
 import LoginPage from "@/features/auth/pages/LoginPage";
 import RegisterPage from "@/features/auth/pages/RegisterPage";
 
+// Phân hệ Admin
+import AdminDashboardPage from "@/features/admin/pages/AdminDashboardPage";
+import UserManagementPage from "@/features/admin/pages/UserManagementPage";
+import ClassroomManagementPage from "@/features/admin/pages/ClassroomManagementPage";
+import SystemBroadcastPage from "@/features/admin/pages/SystemBroadcastPage";
+import AuditLogPage from "@/features/admin/pages/AuditLogPage";
+import AiMonitoringPage from "@/features/admin/pages/AiMonitoringPage";
+import ResourceLibraryPage from "@/features/admin/pages/ResourceLibraryPage";
+
 // Phân hệ Student
 import StudentCoursesPage from "@/features/student/pages/StudentCoursesPage";
 import ClassLessonsPage from "@/features/student/pages/ClassLessonsPage";
-import ClassAssignmentsPage from "@/features/student/pages/ClassAssignmentsPage";
 import LessonDetailPage from "@/features/student/pages/LessonDetailPage";
 import AssignmentTakePage from "@/features/student/pages/AssignmentTakePage";
 import StudentFlashcardsPage from "@/features/student/pages/StudentFlashcardsPage";
 import StudentProfilePage from "@/features/student/pages/StudentProfilePage";
 import SpeakingAiEvaluationPage from "@/features/student/pages/SpeakingAiEvaluationPage";
-
 import DailyHomeworkPage from "@/features/student/pages/DailyHomeworkPage";
+
+// Component chuyển hướng tự động sang Daily Plan nếu có ai truy cập URL bài tập lớp cũ
+const RedirectToDailyPlan = () => {
+  const { classId } = useParams<{ classId: string }>();
+  return <Navigate to={`/student/courses/${classId}/daily-plan`} replace />;
+};
+
 // Component giữ chỗ cho phân hệ Teacher
 const TeacherPendingView = ({ title }: { title: string }) => (
   <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-950 p-12 text-center text-slate-300">
@@ -53,40 +70,59 @@ const routes: RouteObject[] = [
       </ProtectedRoute>
     ),
     children: [
-      // Dùng đường dẫn tuyệt đối /student/courses để chống lặp URL
       { index: true, element: <Navigate to="/student/courses" replace /> },
       { path: "courses", element: <StudentCoursesPage /> },
       { path: "courses/:classId/lessons", element: <ClassLessonsPage /> },
       {
         path: "courses/:classId/assignments",
-        element: <ClassAssignmentsPage />,
+        element: <RedirectToDailyPlan />,
+      },
+      {
+        path: "courses/:classId/daily-plan",
+        element: <DailyHomeworkPage />,
       },
       { path: "lessons/:lessonId", element: <LessonDetailPage /> },
       {
         path: "assignments/:assignmentId/take",
         element: <AssignmentTakePage />,
       },
-
-      // Hỗ trợ cả 3 dạng URL xem kết quả chấm bài AI
       { path: "submissions", element: <SpeakingAiEvaluationPage /> },
       { path: "submissions/:attemptId", element: <SpeakingAiEvaluationPage /> },
       {
         path: "assignments/:assignmentId/submissions/:attemptId",
         element: <SpeakingAiEvaluationPage />,
       },
-      {
-        path: "courses/:classId/daily-plan",
-        element: <DailyHomeworkPage />,
-      },
       { path: "flashcards", element: <StudentFlashcardsPage /> },
       { path: "profile", element: <StudentProfilePage /> },
-
-      // Fallback tuyệt đối nếu gõ sai route bên trong /student
       { path: "*", element: <Navigate to="/student/courses" replace /> },
     ],
   },
 
-  // 3. Phân hệ Teacher & Admin
+  // 3. Phân hệ Admin (Chỉ ROLE_ADMIN truy cập)
+  {
+    path: "/admin",
+    element: (
+      <ProtectedRoute allowedRoles={["ROLE_ADMIN"]}>
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Navigate to="/admin/dashboard" replace /> },
+      { path: "dashboard", element: <AdminDashboardPage /> },
+      { path: "users", element: <UserManagementPage /> },
+      { path: "classrooms", element: <ClassroomManagementPage /> },
+      { path: "classrooms/:classId", element: <ClassroomDetailPage /> },
+      { path: "lessons/:lessonId", element: <AdminLessonDetailPage /> },
+
+      { path: "ai-monitoring", element: <AiMonitoringPage /> },
+      { path: "resource-library", element: <ResourceLibraryPage /> },
+      { path: "broadcast", element: <SystemBroadcastPage /> },
+      { path: "audit-logs", element: <AuditLogPage /> },
+      { path: "*", element: <Navigate to="/admin/dashboard" replace /> },
+    ],
+  },
+
+  // 4. Phân hệ Teacher
   {
     path: "/teacher",
     element: (
@@ -112,7 +148,7 @@ const routes: RouteObject[] = [
     ],
   },
 
-  // 4. Trang thông báo lỗi và Điều hướng mặc định toàn app
+  // 5. Trang thông báo lỗi và Điều hướng mặc định toàn app
   {
     path: "/unauthorized",
     element: (

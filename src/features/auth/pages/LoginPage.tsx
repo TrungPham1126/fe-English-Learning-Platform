@@ -30,17 +30,14 @@ export default function LoginPage() {
   const validate = (): boolean => {
     const nextErrors: FormErrors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
     if (!formData.email.trim()) {
       nextErrors.email = "Vui lòng nhập địa chỉ email";
     } else if (!emailRegex.test(formData.email.trim())) {
       nextErrors.email = "Email không đúng định dạng";
     }
-
     if (!formData.password) {
       nextErrors.password = "Vui lòng nhập mật khẩu";
     }
-
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -56,10 +53,8 @@ export default function LoginPage() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!validate() || isLoading) return;
-
     setIsLoading(true);
     setErrors({});
-
     try {
       const authData = await authApi.login({
         email: formData.email.trim(),
@@ -69,11 +64,13 @@ export default function LoginPage() {
       // Lưu Access Token và User profile vào Zustand store
       setAuth(authData.accessToken, authData.user);
 
-      // Điều hướng theo Role người dùng
-      const isStaff = authData.user.roles.some(
-        (r) => r === "ROLE_TEACHER" || r === "ROLE_ADMIN",
-      );
-      if (isStaff) {
+      // ĐIỀU HƯỚNG THEO ROLE (CẬP NHẬT LOGIC MỚI TẠI ĐÂY)
+      const isAdmin = authData.user.roles.includes("ROLE_ADMIN");
+      const isTeacher = authData.user.roles.includes("ROLE_TEACHER");
+
+      if (isAdmin) {
+        navigate("/admin/users", { replace: true });
+      } else if (isTeacher) {
         navigate("/teacher/classrooms", { replace: true });
       } else {
         navigate("/student/courses", { replace: true });
@@ -97,11 +94,11 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-bold text-slate-800">Đăng Nhập</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Hệ thống Học &amp; Đánh giá Năng lực Tiếng Anh
+            Hệ thống Học & Đánh giá năng lực Tiếng Anh
           </p>
         </div>
 
-        {/* Thông báo lỗi tổng quát từ Server */}
+        {/* Thông báo lỗi từ Server */}
         {errors.general && (
           <div className="mb-5 flex items-center gap-2.5 rounded-lg border border-rose-200 bg-rose-50 p-3.5 text-xs font-medium text-rose-700">
             <AlertCircle size={16} className="shrink-0" />
@@ -125,7 +122,7 @@ export default function LoginPage() {
                 value={formData.email}
                 onChange={handleChange}
                 disabled={isLoading}
-                placeholder="vd: student@englishlearning.com"
+                placeholder="vd: admin@englishlearning.com"
                 className={`w-full rounded-lg border bg-white py-2.5 pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:ring-2 ${
                   errors.email
                     ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100"
@@ -155,7 +152,7 @@ export default function LoginPage() {
                 value={formData.password}
                 onChange={handleChange}
                 disabled={isLoading}
-                placeholder="Nhập mật khẩu của bạn"
+                placeholder="Nhập mật khẩu"
                 className={`w-full rounded-lg border bg-white py-2.5 pl-9 pr-10 text-sm text-slate-800 outline-none transition focus:ring-2 ${
                   errors.password
                     ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100"
@@ -179,7 +176,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60 cursor-pointer"
           >
             {isLoading ? (
               <>
@@ -194,7 +191,7 @@ export default function LoginPage() {
 
         {/* Footer chuyển sang Đăng ký */}
         <div className="mt-6 text-center text-xs text-slate-500">
-          Chưa có tài khoản học viên?{" "}
+          Chưa có tài khoản?{" "}
           <Link
             to="/register"
             className="font-semibold text-indigo-600 hover:underline"
