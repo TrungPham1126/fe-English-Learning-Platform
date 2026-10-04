@@ -34,22 +34,20 @@ import StudentProfilePage from "@/features/student/pages/StudentProfilePage";
 import SpeakingAiEvaluationPage from "@/features/student/pages/SpeakingAiEvaluationPage";
 import DailyHomeworkPage from "@/features/student/pages/DailyHomeworkPage";
 
+// Phân hệ Teacher
+import TeacherDashboardPage from "@/features/teacher/pages/TeacherDashboardPage";
+import TeacherClassroomsPage from "@/features/teacher/pages/TeacherClassroomsPage";
+import TeacherClassDetailPage from "@/features/teacher/pages/TeacherClassDetailPage";
+import TeacherClassStudentsPage from "@/features/teacher/pages/TeacherClassStudentsPage";
+import TeacherDailyPlanPage from "@/features/teacher/pages/TeacherDailyPlanPage";
+import TeacherGradingPage from "@/features/teacher/pages/TeacherGradingPage";
+import TeacherAiQuizLabPage from "@/features/teacher/pages/TeacherAiQuizLabPage";
+
 // Component chuyển hướng tự động sang Daily Plan nếu có ai truy cập URL bài tập lớp cũ
 const RedirectToDailyPlan = () => {
   const { classId } = useParams<{ classId: string }>();
   return <Navigate to={`/student/courses/${classId}/daily-plan`} replace />;
 };
-
-// Component giữ chỗ cho phân hệ Teacher
-const TeacherPendingView = ({ title }: { title: string }) => (
-  <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-950 p-12 text-center text-slate-300">
-    <h2 className="text-xl font-bold text-white mb-2">{title}</h2>
-    <p className="text-sm text-slate-400 max-w-md">
-      Khu vực này thuộc phân hệ Giảng viên / Quản trị viên và đang được phụ
-      trách phát triển bởi thành viên khác trong nhóm.
-    </p>
-  </div>
-);
 
 const routes: RouteObject[] = [
   // 1. Phân hệ Public (Đăng nhập, Đăng ký)
@@ -122,7 +120,7 @@ const routes: RouteObject[] = [
     ],
   },
 
-  // 4. Phân hệ Teacher
+  // 4. Phân hệ Teacher (Giảng viên)
   {
     path: "/teacher",
     element: (
@@ -131,20 +129,47 @@ const routes: RouteObject[] = [
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/teacher/classrooms" replace /> },
+      { index: true, element: <Navigate to="/teacher/dashboard" replace /> },
+      // Dashboard tổng quan thống kê lớp, điểm yếu & việc cần làm
+      {
+        path: "dashboard",
+        element: <TeacherDashboardPage />,
+      },
+      // Quản lý danh sách lớp học
       {
         path: "classrooms",
-        element: <TeacherPendingView title="Quản Lý Lớp Học" />,
+        element: <TeacherClassroomsPage />,
       },
+      // Quản lý chi tiết bài giảng, tài liệu, video & thông báo của lớp
+      {
+        path: "classrooms/:classId",
+        element: <TeacherClassDetailPage />,
+      },
+      // Quản lý học sinh, xem tiến độ & điểm yếu của lớp
+      {
+        path: "classrooms/:classId/students",
+        element: <TeacherClassStudentsPage />,
+      },
+      // Lộ trình học hàng ngày, giao bài, đặt deadline & đính kèm tài liệu
+      {
+        path: "classrooms/:classId/plans",
+        element: <TeacherDailyPlanPage />,
+      },
+      // Chấm bài & xem bài làm học sinh (hỗ trợ cả grading và submissions từ sidebar)
       {
         path: "grading",
-        element: <TeacherPendingView title="Chấm Bài & Đánh Giá" />,
+        element: <TeacherGradingPage />,
       },
       {
-        path: "ai-lab",
-        element: <TeacherPendingView title="AI Quiz Generator Lab" />,
+        path: "submissions",
+        element: <TeacherGradingPage />,
       },
-      { path: "*", element: <Navigate to="/teacher/classrooms" replace /> },
+      // AI Quiz Generator Lab
+      {
+        path: "ai-lab",
+        element: <TeacherAiQuizLabPage />,
+      },
+      { path: "*", element: <Navigate to="/teacher/dashboard" replace /> },
     ],
   },
 
