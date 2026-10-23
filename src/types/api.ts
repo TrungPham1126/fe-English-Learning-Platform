@@ -29,6 +29,9 @@ export interface UserSummaryDto {
   phone?: string;
   avatarUrl?: string;
   roles: RoleName[];
+  targetCefr?: string;
+  currentLevel?: string;
+  isActive?: boolean;
 }
 
 // com.englishlearning.auth.dto.AuthResponse

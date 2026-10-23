@@ -23,6 +23,9 @@ export interface StudentProgressItem {
   completionRate: number;
   averageScore: number;
   weaknesses?: string[];
+  attendanceScore?: number;
+  totalStudyMinutes?: number;
+  dailyProgress?: Record<string, number>;
 }
 
 export interface LessonItem {
@@ -36,99 +39,191 @@ export interface LessonItem {
 }
 
 export const teacherApi = {
-  // =================================================================
-  // 1. Quản lý lớp học & Dashboard
-  // =================================================================
+  // 1. Quản lý lớp học
   getAssignedClasses: () =>
     axiosClient.get<{ data: ClassroomItem[] }>("/api/teacher/classrooms"),
-
-  getClassDetail: (classId: string) =>
-    axiosClient.get(`/api/admin/classrooms/${classId}`),
-
   getTeacherDashboardStats: () =>
-    axiosClient.get("/api/teacher/dashboard/stats"),
+    axiosClient.get<{ data: any }>("/api/v1/teacher/dashboard/stats"),
+  getClassDetail: (classId: string) =>
+    axiosClient.get<{ data: ClassroomItem }>(`/api/teacher/classrooms/${classId}`),
 
-  // =================================================================
-  // 2. Danh sách học sinh, Tiến độ & Điểm yếu
-  // =================================================================
+  // 2. Danh sách học sinh & AI Quota
   getClassStudents: (classId: string) =>
-    axiosClient.get<{ data: any[] }>(`/api/admin/classrooms/${classId}/students`),
+    axiosClient.get<{ data: any[] }>(
+      `/api/teacher/classrooms/${classId}/students`,
+    ),
 
-  getStudentProgressDetail: (classId: string, studentId: string) =>
-    axiosClient.get(`/api/teacher/classrooms/${classId}/students/${studentId}/progress`),
+  getAiQuotas: () =>
+    axiosClient.get<{ data: any[] }>("/api/v1/admin/ai-monitoring/quotas"),
 
-  // =================================================================
-  // 3. Quản lý bài giảng (Lessons), Upload Video & Upload Tài liệu
-  // =================================================================
+  // 3. Bài giảng & Tài nguyên
   getClassLessons: (classId: string) =>
-    axiosClient.get<{ data: LessonItem[] }>(`/api/admin/classrooms/${classId}/lessons`),
+    axiosClient.get<{ data: LessonItem[] }>(
+      `/api/curriculum/classes/${classId}/lessons`,
+    ),
 
-  createLesson: (classId: string, data: { title: string; objectives: string; orderIndex?: number }) =>
-    axiosClient.post(`/api/admin/classrooms/${classId}/lessons`, data),
+  createLesson: (
+    classId: string,
+    data: { title: string; objectives: string; orderIndex?: number; content?: string },
+  ) => axiosClient.post(`/api/curriculum/lessons`, { ...data, classId }),
+
+  deleteLesson: (lessonId: string) =>
+    axiosClient.delete(`/api/curriculum/lessons/${lessonId}`),
 
   uploadLessonDocument: (lessonId: string, file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    return axiosClient.post(`/api/curriculum/lessons/${lessonId}/documents`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    return axiosClient.post(
+      `/api/curriculum/lessons/${lessonId}/documents?fileType=PDF`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
   },
 
   uploadLessonVideo: (lessonId: string, videoFile: File) => {
     const formData = new FormData();
-    formData.append("video", videoFile);
-    return axiosClient.post(`/api/curriculum/lessons/${lessonId}/video`, formData, {
+    formData.append("file", videoFile);
+    return axiosClient.post(`/api/v1/videos?lessonId=${lessonId}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
 
-  // =================================================================
-  // 4. Lộ trình học hàng ngày & Kho tài liệu chung (Global Resources)
-  // =================================================================
+  // 4. Lộ trình & Assignment
+  getClassAssignments: (classId: string) =>
+    axiosClient.get<{ data: any[] }>(
+      `/api/v1/teacher/classrooms/${classId}/assignments`,
+    ),
+
+  uploadAudioFile: (audioFile: File) => {
+    const formData = new FormData();
+    formData.append("file", audioFile);
+    return axiosClient.post<{ data: string }>(
+      "/api/v1/teacher/assignments/upload-audio",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
+  },
+
+  createAssignment: (data: any) =>
+    axiosClient.post(`/api/v1/teacher/assignments`, data),
+
   createDailyPlan: (classId: string, data: any) =>
-    axiosClient.post(`/api/curriculum/daily-plans/class/${classId}`, data),
-
-  getDailyPlans: (classId: string) =>
-    axiosClient.get(`/api/curriculum/daily-plans/class/${classId}`),
-
-  getGlobalResources: () =>
-    axiosClient.get<{ data: any[] }>("/api/curriculum/resources/global"),
-
-  uploadDocument: (formData: FormData) =>
-    axiosClient.post("/api/curriculum/documents/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
+    axiosClient.post(`/api/v1/curriculum/daily-plans`, {
+      ...data,
+      classroomId: classId,
     }),
 
-  // =================================================================
-  // 5. Chấm bài, Xem bài nộp, Điểm số & Thời gian làm bài
-  // =================================================================
-  getSubmissionsForGrading: () =>
-    axiosClient.get<{ data: any[] }>("/api/teacher/grading/submissions"),
+  updateDailyPlan: (planId: string, data: any) =>
+    axiosClient.put(`/api/v1/curriculum/daily-plans/${planId}`, data),
 
-  getSubmissionDetail: (submissionId: string) =>
-    axiosClient.get(`/api/teacher/grading/submissions/${submissionId}`),
+  deleteDailyPlan: (planId: string) =>
+    axiosClient.delete(`/api/v1/curriculum/daily-plans/${planId}`),
 
-  gradeSubmission: (submissionId: string, data: { score: number; feedback: string }) =>
-    axiosClient.post(`/api/teacher/grading/submissions/${submissionId}`, data),
+  addPlanItem: (
+    planId: string,
+    data: {
+      sectionName: string;
+      title: string;
+      itemType: string;
+      orderIndex?: number;
+      assignmentId?: string;
+    },
+  ) => axiosClient.post(`/api/v1/curriculum/daily-plans/${planId}/items`, data),
 
-  // =================================================================
-  // 6. AI Lab & Đề xuất bài tập thông minh
-  // =================================================================
-  generateAiQuiz: (data: { topic: string; level: string; questionCount: number; skill?: string }) =>
-    axiosClient.post("/api/ai/lab/generate-quiz", data),
+  deletePlanItem: (itemId: string) =>
+    axiosClient.delete(`/api/v1/curriculum/daily-plans/items/${itemId}`),
 
-  getAiSkillRecommendations: (classId: string) =>
-    axiosClient.get(`/api/ai/recommendations/class/${classId}`),
+  getDailyPlans: (classId: string) =>
+    axiosClient.get(
+      `/api/v1/curriculum/daily-plans/classrooms/${classId}`,
+    ),
+  getDailyProgressStats: (classId: string) =>
+    axiosClient.get(
+      `/api/v1/curriculum/daily-plans/classrooms/${classId}/progress-stats`,
+    ),
+  getGlobalResources: () =>
+    axiosClient.get<{ data: any[] }>("/api/v1/admin/resources?type=DOC"),
 
-  // =================================================================
-  // 7. Thông báo lớp học (Announcements)
-  // =================================================================
-  createClassAnnouncement: (classId: string, data: { title: string; content: string }) =>
-    axiosClient.post(`/api/teacher/classrooms/${classId}/announcements`, data),
+  // 5. Chấm bài
+  getSubmissionsForGrading: (assignmentId: string) =>
+    axiosClient.get<{ data: any[] }>(
+      `/api/v1/teacher/assignments/${assignmentId}/submissions`,
+    ),
+
+  getSubmissionDetail: (attemptId: string) =>
+    axiosClient.get<{ data: any }>(`/api/v1/teacher/submissions/${attemptId}`),
+
+  gradeSubmission: (
+    attemptId: string,
+    data: { score: number; feedback: string },
+  ) =>
+    axiosClient.post(`/api/v1/teacher/submissions/${attemptId}/grade`, {
+      finalScore: data.score,
+      feedback: data.feedback,
+    }),
+
+  // 6. AI Lab
+  generateAiQuiz: (data: {
+    topic: string;
+    level: string;
+    questionCount: number;
+    lessonId?: string;
+    exerciseType?: string;
+    skillType?: string;
+    assignmentType?: string;
+  }) => {
+    const params = new URLSearchParams();
+    params.append("targetCefr", data.level || "B2");
+    params.append("count", String(data.questionCount || 5));
+    if (data.lessonId && data.lessonId.trim()) {
+      params.append("lessonId", data.lessonId.trim());
+    }
+    if (data.exerciseType && data.exerciseType.trim()) {
+      params.append("exerciseType", data.exerciseType.trim());
+    }
+    if (data.skillType && data.skillType.trim()) {
+      params.append("skillType", data.skillType.trim());
+    }
+    if (data.assignmentType && data.assignmentType.trim()) {
+      params.append("assignmentType", data.assignmentType.trim());
+    }
+
+    return axiosClient.post(
+      `/api/v1/ai/exercise/generate-quiz?${params.toString()}`,
+      data.topic || "General English Practice",
+      { headers: { "Content-Type": "text/plain" }, timeout: 120000 },
+    );
+  },
+
+  publishAiQuiz: (exerciseId: string, classroomId: string) =>
+    axiosClient.post(
+      `/api/v1/ai/exercise/${exerciseId}/publish?classroomId=${classroomId}`,
+    ),
+
+  // 7. Thông báo lớp
+  createClassAnnouncement: (
+    classId: string,
+    data: { title: string; content: string },
+  ) =>
+    axiosClient.post(`/api/v1/notifications/broadcast`, {
+      title: data.title,
+      message: data.content,
+      notificationType: "ANNOUNCEMENT",
+      classroomId: classId,
+    }),
 
   getClassAnnouncements: (classId: string) =>
-    axiosClient.get(`/api/teacher/classrooms/${classId}/announcements`),
+    axiosClient.get(`/api/v1/notifications/classrooms/${classId}`),
 
-  sendNotification: (data: { classId: string; title: string; content: string }) =>
-    axiosClient.post("/api/notifications/broadcast", data),
+  // 8. Tổng hợp Neural Audio TTS
+  synthesizeAudio: (data: { text: string; voice?: string; speed?: string }) =>
+    axiosClient.post<{ data: string }>(
+      "/api/v1/teacher/assignments/synthesize-audio",
+      data,
+      { timeout: 120000 },
+    ),
 };

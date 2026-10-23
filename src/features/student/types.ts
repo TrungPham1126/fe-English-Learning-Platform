@@ -11,9 +11,10 @@ export interface KpiMetrics {
 
 export interface SentenceToken {
   word: string;
-  color: "GREEN" | "YELLOW" | "RED";
+  color: "GREEN" | "YELLOW" | "RED" | "GRAY";
   hasPauseAfter: boolean;
   hasLinkingAfter: boolean;
+  wordStatus?: "SPOKEN" | "MISSING" | "PARTIAL";
 }
 
 export interface PhonemeItem {
@@ -25,6 +26,7 @@ export interface PhonemeItem {
 export interface WordPhonemeDetail {
   word: string;
   score: number;
+  wordStatus?: "SPOKEN" | "MISSING" | "PARTIAL";
   phonemes: PhonemeItem[];
 }
 
@@ -33,6 +35,7 @@ export interface ShadowingEvaluationResponse {
   isPassed: boolean;
   passScore: number;
   statusMessage: string;
+  evaluatedBy?: string;
   kpi: KpiMetrics;
   sentenceTokens: SentenceToken[];
   wordRows: WordPhonemeDetail[];
@@ -106,6 +109,7 @@ export interface LessonSummary {
   title: string;
   orderIndex: number;
   isCompleted?: boolean;
+  objectives?: string;
 }
 
 export interface DocumentResponse {
@@ -184,21 +188,32 @@ export interface QuestionResultDetail {
   studentAnswer?: string;
   audioUrl?: string;
   mediaUrl?: string;
+  targetWord?: string;
+  word?: string;
+  ipa?: string;
   transcript?: string;
   selectedOptionId?: string;
   correctAnswer?: string;
   explanation?: string;
   isCorrect?: boolean;
   options?: QuestionOptionDetail[];
+  evalFeedback?: string;
 }
 
 export interface AttemptResponse {
   attemptId: string;
   assignmentId: string;
   assignmentTitle: string;
+  assignmentDescription?: string;
+  description?: string;
+  skillType?: string;
+  audioUrl?: string;
+  listeningScript?: string;
+  passage?: string;
   attemptNumber: number;
   status: string;
   score?: number;
+  totalScore?: number;
   aiFeedback?: string;
   teacherFeedback?: string;
   startedAt?: string;
@@ -275,3 +290,63 @@ export interface DailyHomeworkOverviewResponse {
   days: DaySummaryDto[];
   currentSelectedDay: DayDetailDto | null;
 }
+
+export interface ReadingShortAnswerEvaluationResult {
+  isContentCorrect: boolean;
+  isGrammarCorrect: boolean;
+  scoreOutOf10: number;
+  contentFeedback?: string;
+  grammarFeedback?: string;
+  suggestedAnswer?: string;
+  passageQuote?: string;
+}
+
+// ================= 6. KOKORO-82M TTS =================
+export interface TtsRequest {
+  text: string;
+  voice?: string;
+  speed?: number;
+}
+
+export interface TtsResponse {
+  audioUrl: string;
+  voice: string;
+  speed: number;
+  durationSeconds?: number;
+  cached?: boolean;
+}
+
+export interface DialogueSegment {
+  speaker: string;
+  voice: string;
+  text: string;
+  startMs: number;
+  endMs: number;
+}
+
+export interface ExerciseAudioResponse {
+  id?: string;
+  exerciseType: "SHADOWING" | "LISTENING";
+  assignmentId: string;
+  questionId: string;
+  status: "PENDING" | "PROCESSING" | "READY" | "FAILED" | "BROKEN";
+  url?: string;
+  durationMs?: number;
+  version: number;
+  generatedBy?: "SYSTEM" | "TEACHER" | "STUDENT_REPAIR";
+  errorMessage?: string;
+  segments?: DialogueSegment[];
+  updatedAt?: string;
+}
+
+export interface KokoroVoice {
+  id: string;
+  name: string;
+  accent: string;
+  gender: string;
+  description: string;
+  pipeline: string;
+  isDefault: boolean;
+}
+
+

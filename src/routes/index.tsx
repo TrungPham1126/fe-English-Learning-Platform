@@ -18,7 +18,11 @@ import RegisterPage from "@/features/auth/pages/RegisterPage";
 // Phân hệ Admin
 import AdminDashboardPage from "@/features/admin/pages/AdminDashboardPage";
 import UserManagementPage from "@/features/admin/pages/UserManagementPage";
+import TeacherManagementPage from "@/features/admin/pages/TeacherManagementPage";
+import StudentManagementPage from "@/features/admin/pages/StudentManagementPage";
 import ClassroomManagementPage from "@/features/admin/pages/ClassroomManagementPage";
+import VideoModerationPage from "@/features/admin/pages/VideoModerationPage";
+import AdminReportsPage from "@/features/admin/pages/AdminReportsPage";
 import SystemBroadcastPage from "@/features/admin/pages/SystemBroadcastPage";
 import AuditLogPage from "@/features/admin/pages/AuditLogPage";
 import AiMonitoringPage from "@/features/admin/pages/AiMonitoringPage";
@@ -29,7 +33,6 @@ import StudentCoursesPage from "@/features/student/pages/StudentCoursesPage";
 import ClassLessonsPage from "@/features/student/pages/ClassLessonsPage";
 import LessonDetailPage from "@/features/student/pages/LessonDetailPage";
 import AssignmentTakePage from "@/features/student/pages/AssignmentTakePage";
-import StudentFlashcardsPage from "@/features/student/pages/StudentFlashcardsPage";
 import StudentProfilePage from "@/features/student/pages/StudentProfilePage";
 import SpeakingAiEvaluationPage from "@/features/student/pages/SpeakingAiEvaluationPage";
 import DailyHomeworkPage from "@/features/student/pages/DailyHomeworkPage";
@@ -41,7 +44,6 @@ import TeacherClassDetailPage from "@/features/teacher/pages/TeacherClassDetailP
 import TeacherClassStudentsPage from "@/features/teacher/pages/TeacherClassStudentsPage";
 import TeacherDailyPlanPage from "@/features/teacher/pages/TeacherDailyPlanPage";
 import TeacherGradingPage from "@/features/teacher/pages/TeacherGradingPage";
-import TeacherAiQuizLabPage from "@/features/teacher/pages/TeacherAiQuizLabPage";
 
 // Component chuyển hướng tự động sang Daily Plan nếu có ai truy cập URL bài tập lớp cũ
 const RedirectToDailyPlan = () => {
@@ -50,12 +52,12 @@ const RedirectToDailyPlan = () => {
 };
 
 const routes: RouteObject[] = [
-  // 1. Phân hệ Public (Đăng nhập, Đăng ký)
+  // 1. Phân hệ Public (Đăng nhập, Đăng ký đã đóng chuyển hướng về Đăng nhập)
   {
     element: <PublicLayout />,
     children: [
       { path: "/login", element: <LoginPage /> },
-      { path: "/register", element: <RegisterPage /> },
+      { path: "/register", element: <Navigate replace to="/login" /> },
     ],
   },
 
@@ -90,7 +92,6 @@ const routes: RouteObject[] = [
         path: "assignments/:assignmentId/submissions/:attemptId",
         element: <SpeakingAiEvaluationPage />,
       },
-      { path: "flashcards", element: <StudentFlashcardsPage /> },
       { path: "profile", element: <StudentProfilePage /> },
       { path: "*", element: <Navigate to="/student/courses" replace /> },
     ],
@@ -107,15 +108,19 @@ const routes: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to="/admin/dashboard" replace /> },
       { path: "dashboard", element: <AdminDashboardPage /> },
-      { path: "users", element: <UserManagementPage /> },
+      { path: "teachers", element: <TeacherManagementPage /> },
+      { path: "students", element: <StudentManagementPage /> },
       { path: "classrooms", element: <ClassroomManagementPage /> },
       { path: "classrooms/:classId", element: <ClassroomDetailPage /> },
       { path: "lessons/:lessonId", element: <AdminLessonDetailPage /> },
+      { path: "reports", element: <AdminReportsPage /> },
+      { path: "video-moderation", element: <VideoModerationPage /> },
 
-      { path: "ai-monitoring", element: <AiMonitoringPage /> },
+      { path: "users", element: <UserManagementPage /> },
       { path: "resource-library", element: <ResourceLibraryPage /> },
       { path: "broadcast", element: <SystemBroadcastPage /> },
       { path: "audit-logs", element: <AuditLogPage /> },
+      { path: "ai-monitoring", element: <AiMonitoringPage /> },
       { path: "*", element: <Navigate to="/admin/dashboard" replace /> },
     ],
   },
@@ -163,11 +168,6 @@ const routes: RouteObject[] = [
       {
         path: "submissions",
         element: <TeacherGradingPage />,
-      },
-      // AI Quiz Generator Lab
-      {
-        path: "ai-lab",
-        element: <TeacherAiQuizLabPage />,
       },
       { path: "*", element: <Navigate to="/teacher/dashboard" replace /> },
     ],

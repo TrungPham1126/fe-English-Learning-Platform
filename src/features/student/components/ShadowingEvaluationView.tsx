@@ -10,7 +10,10 @@ interface Props {
 export default function ShadowingEvaluationView({ data }: Props) {
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
 
-  const getScoreColor = (score: number) => {
+  const getScoreColor = (score: number, isMissing: boolean = false) => {
+    if (isMissing) {
+      return "text-slate-600 bg-slate-100 border-slate-300";
+    }
     if (score >= 80)
       return "text-emerald-700 bg-emerald-100 border-emerald-300";
     if (score >= 60) return "text-amber-700 bg-amber-100 border-amber-300";
@@ -18,7 +21,7 @@ export default function ShadowingEvaluationView({ data }: Props) {
   };
 
   const getTokenStyle = (
-    color: "GREEN" | "YELLOW" | "RED",
+    color: "GREEN" | "YELLOW" | "RED" | "GRAY",
     isSelected: boolean,
   ) => {
     const base =
@@ -46,6 +49,12 @@ export default function ShadowingEvaluationView({ data }: Props) {
           selectedRing +
           "bg-rose-50 text-rose-700 border-rose-400 hover:bg-rose-100"
         );
+      case "GRAY":
+        return (
+          base +
+          selectedRing +
+          "bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200 opacity-80"
+        );
       default:
         return (
           base + selectedRing + "bg-slate-50 text-slate-700 border-slate-200"
@@ -67,8 +76,10 @@ export default function ShadowingEvaluationView({ data }: Props) {
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1 rounded-md bg-indigo-600 text-white px-3 py-1 text-xs font-black tracking-widest uppercase shadow-sm">
-                <Zap className="fill-current text-amber-300" size={14} /> Groq
-                AI Engine &lt;2s
+                <Zap className="fill-current text-amber-300" size={14} />{" "}
+                {data.evaluatedBy === "PYTHON_ACOUSTIC_ENGINE"
+                  ? "Acoustic AI Engine (Praat F1/F2)"
+                  : "Groq AI Engine <2s"}
               </span>
               <span
                 className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-black border-2 shadow-sm ${
@@ -129,12 +140,16 @@ export default function ShadowingEvaluationView({ data }: Props) {
               <span className="h-3.5 w-3.5 rounded-full bg-rose-500 shadow-sm" />{" "}
               Sai
             </span>
+            <span className="flex items-center gap-1.5 text-slate-500">
+              <span className="h-3.5 w-3.5 rounded-full bg-slate-400 shadow-sm" />{" "}
+              Chưa đọc
+            </span>
           </div>
         </div>
 
         {/* Hàng Tokens hiển thị bự */}
         <div className="p-6 md:p-8 rounded-2xl bg-slate-50/80 border-2 border-slate-100 flex flex-wrap items-center gap-y-5 gap-x-3 leading-loose">
-          {data.sentenceTokens.map((token, idx) => {
+          {(data.sentenceTokens || []).map((token, idx) => {
             const cleanWord = token.word.replace(/[.,?!]/g, "").toLowerCase();
             const isSelected = selectedWord === cleanWord;
             return (
@@ -177,27 +192,27 @@ export default function ShadowingEvaluationView({ data }: Props) {
         {[
           {
             label: "Phát âm (Pronunciation)",
-            value: data.kpi.pronunciation,
+            value: data.kpi?.pronunciation ?? Math.round(data.overallScore),
             unit: "/100",
           },
           {
             label: "Trôi chảy (Fluency)",
-            value: data.kpi.fluency,
+            value: data.kpi?.fluency ?? Math.round(data.overallScore),
             unit: "/100",
           },
           {
             label: "Hoàn thiện (Completeness)",
-            value: data.kpi.completeness,
+            value: data.kpi?.completeness ?? 100,
             unit: "%",
           },
           {
             label: "Ngữ điệu (Prosody)",
-            value: data.kpi.prosody,
+            value: data.kpi?.prosody ?? Math.round(data.overallScore),
             unit: "/100",
           },
           {
             label: "Tốc độ nói (WPM)",
-            value: data.kpi.wordsPerMinute,
+            value: data.kpi?.wordsPerMinute ?? 120,
             unit: "WPM",
           },
         ].map((item, index) => (
@@ -251,48 +266,66 @@ export default function ShadowingEvaluationView({ data }: Props) {
           )}
         </div>
         <div className="divide-y-2 divide-slate-100 max-h-[500px] overflow-y-auto pr-2">
-          {data.wordRows
+          {(data.wordRows || [])
             .filter(
               (row) => !selectedWord || row.word.toLowerCase() === selectedWord,
             )
-            .map((row, idx) => (
-              <div
-                key={idx}
-                className="py-4 lg:py-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50 transition px-2 rounded-xl"
-              >
-                <div className="w-40 flex items-center gap-3">
-                  <span className="font-black text-xl lg:text-2xl text-slate-900">
-                    {row.word}
-                  </span>
-                  <span
-                    className={`text-sm font-black px-3 py-1 rounded-lg border-2 shadow-sm ${getScoreColor(row.score)}`}
-                  >
-                    {row.score}
-                  </span>
-                </div>
-                {/* Các âm (Phonemes) được phóng to, sử dụng font Mono */}
-                <div className="flex-1 flex flex-wrap items-center gap-3">
-                  {row.phonemes.map((ph, pIdx) => (
-                    <div
-                      key={pIdx}
-                      className={`px-4 py-2 rounded-xl border-2 flex items-center gap-2 shadow-sm ${getScoreColor(ph.score)}`}
+            .map((row, idx) => {
+              const isMissing = row.wordStatus === "MISSING" || row.score === 0;
+              return (
+                <div
+                  key={idx}
+                  className="py-4 lg:py-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50 transition px-2 rounded-xl"
+                >
+                  <div className="w-48 flex items-center gap-3">
+                    <span
+                      className={`font-black text-xl lg:text-2xl ${
+                        isMissing ? "text-slate-400 line-through" : "text-slate-900"
+                      }`}
                     >
-                      <span className="font-mono font-black text-xl lg:text-2xl tracking-wider">
-                        {ph.ipa}
-                      </span>
-                      <span className="text-sm font-bold opacity-80 bg-white/50 px-2 py-0.5 rounded">
-                        ({ph.score})
-                      </span>
-                      {ph.note && (
-                        <span className="text-sm font-bold ml-2 pl-2 border-l-2 border-current/30">
-                          {ph.note}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                      {row.word}
+                    </span>
+                    <span
+                      className={`text-sm font-black px-3 py-1 rounded-lg border-2 shadow-sm ${getScoreColor(
+                        row.score,
+                        isMissing,
+                      )}`}
+                    >
+                      {isMissing ? "Chưa đọc" : `${row.score} pts`}
+                    </span>
+                  </div>
+                  {/* Các âm (Phonemes) được phóng to, sử dụng font Mono */}
+                  <div className="flex-1 flex flex-wrap items-center gap-3">
+                    {(row.phonemes || []).map((ph, pIdx) => {
+                      const phMissing = isMissing || ph.score === 0 || ph.note === "Bạn chưa đọc từ này.";
+                      return (
+                        <div
+                          key={pIdx}
+                          className={`px-4 py-2 rounded-xl border-2 flex items-center gap-2 shadow-sm ${getScoreColor(
+                            ph.score,
+                            phMissing,
+                          )}`}
+                        >
+                          <span className="font-mono font-black text-xl lg:text-2xl tracking-wider">
+                            {ph.ipa}
+                          </span>
+                          {!phMissing && (
+                            <span className="text-sm font-bold opacity-80 bg-white/50 px-2 py-0.5 rounded">
+                              ({ph.score})
+                            </span>
+                          )}
+                          {ph.note && (
+                            <span className="text-sm font-bold ml-2 pl-2 border-l-2 border-current/30">
+                              {ph.note}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
       </div>
     </div>

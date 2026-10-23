@@ -15,9 +15,43 @@ import type {
   ShadowingEvaluationResponse,
   WritingAiEvaluationResult,
   DailyHomeworkOverviewResponse,
+  ReadingShortAnswerEvaluationResult,
+  TtsRequest,
+  TtsResponse,
+  ExerciseAudioResponse,
+  KokoroVoice,
 } from "../types";
 
 export const studentApi = {
+  updateProfile: async (data: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    currentLevel?: string;
+    targetCefr?: string;
+    avatarUrl?: string;
+  }) => {
+    const res = await axiosClient.put("/api/v1/auth/me", data);
+    return res.data.data;
+  },
+
+  updateAvatar: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await axiosClient.post("/api/v1/users/avatar", formData);
+    return res.data.data;
+  },
+
+  uploadAvatar: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await axiosClient.post("/api/v1/users/avatar", formData);
+    return res.data.data;
+  },
+
+
+
+
   // ================= 1. LỚP HỌC (CLASSROOMS) =================
   getMyCourses: async (): Promise<MyCourseResponse[]> => {
     const res = await axiosClient.get<ApiResponse<MyCourseResponse[]>>(
@@ -87,6 +121,10 @@ export const studentApi = {
     return res.data.data;
   },
 
+  startAttempt: async (assignmentId: string): Promise<AttemptResponse> => {
+    return studentApi.startAssignment(assignmentId);
+  },
+
   getMyAttempts: async (assignmentId: string): Promise<AttemptResponse[]> => {
     const res = await axiosClient.get<ApiResponse<AttemptResponse[]>>(
       `/api/v1/student/assignments/${assignmentId}/attempts`,
@@ -123,12 +161,11 @@ export const studentApi = {
     audioBlob: Blob,
   ): Promise<AttemptResponse> => {
     const formData = new FormData();
-    formData.append("audio", audioBlob, "recording.wav");
+    formData.append("audio", audioBlob, "recording.webm");
 
     const res = await axiosClient.post<ApiResponse<AttemptResponse>>(
       `/api/v1/student/assignments/attempts/${attemptId}/questions/${questionId}/audio`,
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } },
     );
     return res.data.data;
   },
@@ -143,13 +180,12 @@ export const studentApi = {
   ): Promise<SpeakingAiEvaluationResult> => {
     const formData = new FormData();
     formData.append("topic", topic);
-    formData.append("audio", audioBlob, "speaking.wav");
+    formData.append("audio", audioBlob, "speaking.webm");
     formData.append("studentAnswerId", studentAnswerId);
 
     const res = await axiosClient.post<ApiResponse<SpeakingAiEvaluationResult>>(
       "/api/v1/ai/speaking/evaluate",
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } },
     );
     return res.data.data;
   },
@@ -157,21 +193,22 @@ export const studentApi = {
   // 4.2. Chấm đọc theo câu Shadowing (Groq Whisper-large-v3 + LLaMA 3.3 70B <2s)
   evaluateShadowingAI: async (
     audioBlob: Blob,
-    studentAnswerId: string,
+    studentAnswerId?: string,
     referenceSentence?: string,
   ): Promise<ShadowingEvaluationResponse> => {
     const formData = new FormData();
-    formData.append("audio", audioBlob, "shadowing.wav");
-    formData.append("studentAnswerId", studentAnswerId);
-    if (referenceSentence) {
-      formData.append("referenceSentence", referenceSentence);
+    const filename = audioBlob.type.includes("wav") ? "shadowing.wav" : "shadowing.webm";
+    formData.append("audio", audioBlob, filename);
+    if (studentAnswerId && studentAnswerId !== "undefined" && studentAnswerId !== "null" && studentAnswerId.trim() !== "") {
+      formData.append("studentAnswerId", studentAnswerId.trim());
+    }
+    if (referenceSentence && referenceSentence.trim() !== "") {
+      formData.append("referenceSentence", referenceSentence.trim());
     }
 
     const res = await axiosClient.post<
       ApiResponse<ShadowingEvaluationResponse>
-    >("/api/v1/ai/speaking/shadowing-evaluate", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    >("/api/v1/ai/speaking/shadowing-evaluate", formData);
     return res.data.data;
   },
 
@@ -229,7 +266,100 @@ export const studentApi = {
     return res.data.data;
   },
 
+  getClassDailyPlans: async (classroomId: string): Promise<any[]> => {
+    const res = await axiosClient.get<ApiResponse<any[]>>(
+      `/api/v1/curriculum/daily-plans/classrooms/${classroomId}`,
+    );
+    return res.data.data || [];
+  },
+
   markDailyPlanComplete: async (planId: string): Promise<void> => {
     await axiosClient.post(`/api/v1/curriculum/daily-plans/${planId}/complete`);
+  },
+
+  // 8. ĐÁNH GIÁ ĐỌC HIỂU CÂU TRẢ LỜI NGẮN (READING SHORT ANSWER AI)
+  evaluateReadingShortAnswerAI: async (
+    passage: string,
+    question: string,
+    studentAnswer: string,
+    expectedAnswer?: string,
+  ): Promise<ReadingShortAnswerEvaluationResult> => {
+    const res = await axiosClient.post<ApiResponse<ReadingShortAnswerEvaluationResult>>(
+      "/api/v1/ai/reading/evaluate-short-answer",
+      { passage, question, studentAnswer, expectedAnswer },
+    );
+    return res.data.data;
+  },
+
+  // 9. KOKORO-82M NEURAL TTS SYNTHESIZER & SELF-HEALING
+  synthesizeTTS: async (params: TtsRequest): Promise<TtsResponse> => {
+    const res = await axiosClient.post<ApiResponse<TtsResponse>>(
+      "/api/v1/ai/tts",
+      params,
+    );
+    return res.data.data;
+  },
+
+  repairQuestionAudio: async (questionId: string): Promise<ExerciseAudioResponse> => {
+    const res = await axiosClient.post<ApiResponse<ExerciseAudioResponse>>(
+      `/api/v1/ai/tts/questions/${questionId}/repair`
+    );
+    return res.data.data;
+  },
+
+  getQuestionAudioStatus: async (questionId: string): Promise<ExerciseAudioResponse> => {
+    const res = await axiosClient.get<ApiResponse<ExerciseAudioResponse>>(
+      `/api/v1/ai/tts/questions/${questionId}/status`
+    );
+    return res.data.data;
+  },
+
+  getKokoroVoices: async (): Promise<KokoroVoice[]> => {
+    const res = await axiosClient.get<ApiResponse<KokoroVoice[]>>(
+      "/api/v1/ai/tts/voices"
+    );
+    return res.data.data;
+  },
+
+  // 10. THÔNG BÁO HỆ THỐNG & LỚP HỌC (NOTIFICATIONS)
+  getMyNotifications: async (page: number = 0, size: number = 30): Promise<any[]> => {
+    const res: any = await axiosClient.get(`/api/v1/notifications?page=${page}&size=${size}`);
+    const rawData = res.data?.data ?? res.data;
+    const rawList = Array.isArray(rawData)
+      ? rawData
+      : Array.isArray(rawData?.content)
+      ? rawData.content
+      : [];
+
+    const dedupMap = new Map<string, any>();
+    for (const item of rawList) {
+      const text = (item.message || item.content || "").trim();
+      const key = `${(item.title || "").trim()}||${text}`;
+      if (!dedupMap.has(key)) {
+        dedupMap.set(key, item);
+      } else {
+        const existing = dedupMap.get(key)!;
+        if ((!existing.isRead && item.isRead) || (!existing.recipientUserId && item.recipientUserId)) {
+          dedupMap.set(key, { ...item, isRead: Boolean(existing.isRead || item.isRead) });
+        }
+      }
+    }
+    return Array.from(dedupMap.values());
+  },
+
+  markNotificationAsRead: async (id: string): Promise<void> => {
+    try {
+      await axiosClient.put(`/api/v1/notifications/${id}/read`);
+    } catch {
+      await axiosClient.patch(`/api/v1/notifications/${id}/read`);
+    }
+  },
+
+  markAllNotificationsAsRead: async (): Promise<void> => {
+    try {
+      await axiosClient.put("/api/v1/notifications/read-all");
+    } catch {
+      await axiosClient.patch("/api/v1/notifications/read-all");
+    }
   },
 };

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { adminApi } from "@/features/admin/api/adminApi";
 import { studentApi } from "@/features/student/api/studentApi";
-import type { ClassroomResponse } from "@/features/admin/types";
+import type { ClassroomResponse, StudentEnrollmentItem } from "@/features/admin/types";
 import type { UserSummaryDto } from "@/types/api";
 import type { LessonSummary } from "@/features/student/types"; // Import chuẩn xác
 import {
@@ -21,6 +21,12 @@ import {
   BookOpen,
   Plus,
   Trash2,
+  Users,
+  GraduationCap,
+  Calendar,
+  Check,
+  UserX,
+  School,
 } from "lucide-react";
 import VideoPlayer from "@/features/student/components/VideoPlayer";
 
@@ -35,6 +41,7 @@ export default function ClassroomDetailPage() {
   const [teachers, setTeachers] = useState<UserSummaryDto[]>([]);
   const [pendingVideos, setPendingVideos] = useState<any[]>([]);
   const [lessons, setLessons] = useState<any[]>([]);
+  const [enrolledStudents, setEnrolledStudents] = useState<StudentEnrollmentItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Form States
@@ -108,6 +115,15 @@ export default function ClassroomDetailPage() {
         }
       } catch (videoErr) {
         setPendingVideos([]);
+      }
+
+      // 4. Tải danh sách học viên trong lớp
+      try {
+        const students = await adminApi.getClassStudents(classId);
+        setEnrolledStudents(students);
+      } catch (stErr) {
+        console.warn("Lỗi tải học viên lớp", stErr);
+        setEnrolledStudents([]);
       }
     } catch (err) {
       console.error(err);
@@ -198,6 +214,26 @@ export default function ClassroomDetailPage() {
     }
   };
 
+  const handleRemoveStudent = async (studentId: string, studentName: string) => {
+    if (!classId) return;
+    if (
+      !window.confirm(
+        `Bạn có chắc chắn muốn xóa học viên "${studentName}" khỏi lớp học này?`,
+      )
+    )
+      return;
+    setIsProcessing(true);
+    try {
+      await adminApi.removeStudentFromClass(classId, studentId);
+      alert("Đã xóa học viên khỏi lớp học!");
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Lỗi khi xóa học viên khỏi lớp");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleApproveVideo = async (id: string) => {
     if (!window.confirm("Phê duyệt video?")) return;
     setIsProcessing(true);
@@ -244,29 +280,35 @@ export default function ClassroomDetailPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-in fade-in zoom-in-95 duration-200">
-      {/* HEADER */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      {/* Clean Open Header */}
+      <div className="pb-6 mb-6 border-b border-slate-200 dark:border-slate-800/80 bg-transparent space-y-4">
         <button
           onClick={() => navigate("/admin/classrooms")}
-          className="flex items-center gap-1.5 text-slate-500 hover:text-indigo-600 text-sm font-bold mb-4 transition cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 text-xs font-bold transition cursor-pointer"
         >
-          <ArrowLeft size={16} /> Quay lại danh sách
+          <ArrowLeft size={14} /> Quay lại danh sách
         </button>
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black text-slate-900">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/50 mb-2">
+              <School size={14} />
+              <span>Chi Tiết Lớp Học</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
               {classroom.name}
             </h1>
-            <div className="flex items-center gap-4 mt-2 text-sm font-semibold text-slate-600">
-              <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg uppercase">
-                Level: {classroom.level}
-              </span>
-              <span>
-                Sĩ số: {classroom.currentStudentsCount} /{" "}
-                {classroom.maxStudents || "∞"}
-              </span>
-              <span>GV: {classroom.teacherName || "Chưa phân công"}</span>
-            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800 uppercase">
+              Level: {classroom.level}
+            </span>
+            <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-[#111827] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800 shadow-sm">
+              Sĩ số: {classroom.currentStudentsCount} / {classroom.maxStudents || "∞"}
+            </span>
+            <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-[#111827] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800 shadow-sm">
+              GV: {classroom.teacherName || "Chưa phân công"}
+            </span>
           </div>
         </div>
       </div>
@@ -612,34 +654,173 @@ export default function ClassroomDetailPage() {
       )}
 
       {activeTab === "students" && (
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 max-w-2xl">
-          <div className="mb-6">
-            <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
-              <UserPlus className="text-indigo-600" /> Thêm học viên vào lớp
-            </h3>
-            <p className="text-sm text-slate-500 mt-1">
-              Sử dụng Email hoặc SĐT đã đăng ký trên hệ thống để ghi danh học
-              viên.
-            </p>
+        <div className="space-y-6">
+          {/* TOP CARDS: ENROLL FORM & CLASS CAPACITY */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="mb-4">
+                <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+                  <UserPlus className="text-indigo-600" size={18} /> Ghi Danh Học Viên Mới
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Nhập Email hoặc Số điện thoại của tài khoản học viên để thêm vào lớp học này.
+                </p>
+              </div>
+              <form onSubmit={handleEnrollStudent} className="flex flex-col sm:flex-row gap-3">
+                <input
+                  required
+                  type="text"
+                  value={enrollIdentifier}
+                  onChange={(e) => setEnrollIdentifier(e.target.value)}
+                  className="flex-1 border-2 border-slate-200 rounded-xl p-3 outline-none focus:border-indigo-600 text-sm font-bold text-slate-900"
+                  placeholder="VD: student@example.com hoặc 0912345678"
+                />
+                <button
+                  type="submit"
+                  disabled={isProcessing || !enrollIdentifier.trim()}
+                  className="flex justify-center items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 cursor-pointer disabled:opacity-50 transition shadow-sm text-xs whitespace-nowrap"
+                >
+                  {isProcessing && <Loader2 size={16} className="animate-spin" />} Ghi Danh Vào Lớp
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">
+                  Sĩ Số Lớp Hiện Tại
+                </span>
+                <div className="text-2xl font-black text-slate-900 mt-2">
+                  {enrolledStudents.length}{" "}
+                  <span className="text-sm font-semibold text-slate-500">
+                    / {classroom.maxStudents || "∞"} học viên
+                  </span>
+                </div>
+              </div>
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden mt-4">
+                <div
+                  className="bg-indigo-600 h-full rounded-full transition-all duration-300"
+                  style={{
+                    width: `${
+                      classroom.maxStudents
+                        ? Math.min(
+                            100,
+                            Math.round(
+                              (enrolledStudents.length / classroom.maxStudents) * 100,
+                            ),
+                          )
+                        : 50
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
           </div>
-          <form onSubmit={handleEnrollStudent} className="space-y-4">
-            <input
-              required
-              type="text"
-              value={enrollIdentifier}
-              onChange={(e) => setEnrollIdentifier(e.target.value)}
-              className="w-full border-2 border-slate-200 rounded-xl p-4 outline-none focus:border-indigo-600 text-base font-bold text-slate-900"
-              placeholder="VD: student@gmail.com hoặc 0912345678"
-            />
-            <button
-              type="submit"
-              disabled={isProcessing || !enrollIdentifier.trim()}
-              className="w-full flex justify-center items-center gap-2 px-6 py-4 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-700 cursor-pointer disabled:opacity-50 transition shadow-sm"
-            >
-              {isProcessing && <Loader2 size={18} className="animate-spin" />}{" "}
-              TIẾN HÀNH GHI DANH
-            </button>
-          </form>
+
+          {/* BOTTOM TABLE: ENROLLED STUDENTS LIST */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+                  <Users className="text-indigo-600" size={18} /> Danh Sách Học Viên Đang Theo Học ({enrolledStudents.length})
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Theo dõi tiến độ hoàn thành bài tập, điểm số trung bình và quản lý danh sách lớp.
+                </p>
+              </div>
+            </div>
+
+            {enrolledStudents.length === 0 ? (
+              <div className="p-16 text-center text-slate-500">
+                <Users size={48} className="mx-auto text-slate-300 mb-3" />
+                <h4 className="text-base font-bold text-slate-800">Lớp học chưa có học viên</h4>
+                <p className="text-xs text-slate-400 mt-1">
+                  Sử dụng ô tìm kiếm phía trên để ghi danh học viên đầu tiên vào lớp.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-black border-b border-slate-200">
+                      <th className="p-4 pl-6">Học Viên</th>
+                      <th className="p-4">Liên Hệ</th>
+                      <th className="p-4">Ngày Ghi Danh</th>
+                      <th className="p-4 text-center">Tiến Độ Bài Tập</th>
+                      <th className="p-4 text-center">Điểm Trung Bình</th>
+                      <th className="p-4 pr-6 text-right">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {enrolledStudents.map((st) => {
+                      const studentName =
+                        st.fullName ||
+                        `${st.lastName || ""} ${st.firstName || ""}`.trim() ||
+                        st.email;
+                      const completion = st.completionRate ?? 0;
+                      return (
+                        <tr key={st.studentId} className="hover:bg-slate-50/80 transition">
+                          <td className="p-4 pl-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 font-black flex items-center justify-center text-xs shadow-inner">
+                                {studentName.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-900">{studentName}</p>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="p-4 text-slate-600 text-xs">
+                            <div className="font-semibold text-slate-800">{st.email}</div>
+                            {st.phone && <div className="text-slate-400 mt-0.5">{st.phone}</div>}
+                          </td>
+
+                          <td className="p-4 text-slate-500 text-xs">
+                            {st.enrolledAt ? new Date(st.enrolledAt).toLocaleDateString("vi-VN") : "—"}
+                          </td>
+
+                          <td className="p-4 text-center">
+                            <div className="flex flex-col items-center">
+                              <span className="text-xs font-bold text-slate-800">{completion}%</span>
+                              <div className="w-20 bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
+                                <div
+                                  className="bg-emerald-500 h-full rounded-full"
+                                  style={{ width: `${completion}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] text-slate-400 mt-0.5">
+                                {st.completedTasks ?? 0}/{st.totalTasks ?? 0} bài
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="p-4 text-center">
+                            <span className="font-black text-slate-900 text-sm">
+                              {st.averageScore !== undefined && st.averageScore !== null
+                                ? Number(st.averageScore).toFixed(1)
+                                : "—"}
+                            </span>
+                          </td>
+
+                          <td className="p-4 pr-6 text-right">
+                            <button
+                              onClick={() => handleRemoveStudent(st.studentId, studentName)}
+                              disabled={isProcessing}
+                              title="Xóa học viên khỏi lớp"
+                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                            >
+                              <UserX size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

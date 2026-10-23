@@ -9,6 +9,10 @@ import type {
   NotificationBroadcastRequest,
   AdminDashboardStats,
   AuditLogDto,
+  StudentEnrollmentItem,
+  VideoModerationItem,
+  AiStatsResponse,
+  StudentQuotaItem,
 } from "../types";
 
 export const adminApi = {
@@ -16,10 +20,15 @@ export const adminApi = {
   getUsers: async (
     page = 0,
     size = 20,
+    role?: string,
+    keyword?: string,
   ): Promise<PageResponse<UserSummaryDto>> => {
+    let url = `/api/v1/admin/users?page=${page}&size=${size}`;
+    if (role) url += `&role=${encodeURIComponent(role)}`;
+    if (keyword && keyword.trim()) url += `&keyword=${encodeURIComponent(keyword.trim())}`;
     const res = await axiosClient.get<
       ApiResponse<PageResponse<UserSummaryDto>>
-    >(`/api/v1/admin/users?page=${page}&size=${size}`);
+    >(url);
     return res.data.data;
   },
   createUser: async (
@@ -54,11 +63,36 @@ export const adminApi = {
   getClassrooms: async (
     page = 0,
     size = 20,
+    status?: string,
   ): Promise<PageResponse<ClassroomResponse>> => {
+    let url = `/api/admin/classrooms?page=${page}&size=${size}`;
+    if (status) url += `&status=${status}`;
     const res = await axiosClient.get<
       ApiResponse<PageResponse<ClassroomResponse>>
-    >(`/api/admin/classrooms?page=${page}&size=${size}`);
+    >(url);
     return res.data.data;
+  },
+  getClassroomById: async (id: string): Promise<ClassroomResponse> => {
+    const res = await axiosClient.get<ApiResponse<ClassroomResponse>>(
+      `/api/admin/classrooms/${id}`,
+    );
+    return res.data.data;
+  },
+  getClassStudents: async (
+    classId: string,
+  ): Promise<StudentEnrollmentItem[]> => {
+    const res = await axiosClient.get<ApiResponse<StudentEnrollmentItem[]>>(
+      `/api/admin/classrooms/${classId}/students`,
+    );
+    return res.data.data || [];
+  },
+  removeStudentFromClass: async (
+    classId: string,
+    studentId: string,
+  ): Promise<void> => {
+    await axiosClient.delete(
+      `/api/admin/classrooms/${classId}/students/${studentId}`,
+    );
   },
   createClassroom: async (
     data: CreateClassroomRequest,
@@ -100,15 +134,41 @@ export const adminApi = {
 
   // --- NOTIFICATIONS ---
   broadcastNotification: async (
-    data: NotificationBroadcastRequest,
-  ): Promise<void> => {
-    await axiosClient.post("/api/v1/notifications/broadcast", data);
+    data: NotificationBroadcastRequest | any,
+  ): Promise<any> => {
+    const rawMsg = (data.message || data.content || "").trim();
+    const payload = {
+      title: (data.title || "").trim(),
+      message: rawMsg,
+      content: rawMsg,
+      type: data.type || data.notificationType || "ANNOUNCEMENT",
+      notificationType: data.notificationType || data.type || "ANNOUNCEMENT",
+      targetAudience: data.targetAudience || "ALL",
+      targetUrl: data.targetUrl || data.redirectUrl || "/student/courses",
+      redirectUrl: data.redirectUrl || data.targetUrl || "/student/courses",
+    };
+    const res = await axiosClient.post("/api/v1/notifications/broadcast", payload);
+    return res.data;
+  },
+  getBroadcastHistory: async (page = 0, size = 10): Promise<any> => {
+    const res = await axiosClient.get(
+      `/api/v1/notifications/broadcast-history?page=${page}&size=${size}`,
+    );
+    return res.data.data;
   },
 
   // --- VIDEO MODERATION ---
-  getPendingVideos: async (): Promise<any[]> => {
-    const res = await axiosClient.get(`/api/v1/videos?status=PENDING_REVIEW`);
-    return res.data.data;
+  getPendingVideos: async (): Promise<VideoModerationItem[]> => {
+    const res = await axiosClient.get<ApiResponse<VideoModerationItem[]>>(
+      `/api/v1/videos?status=PENDING_REVIEW`,
+    );
+    return res.data.data || [];
+  },
+  getVideos: async (status?: string): Promise<VideoModerationItem[]> => {
+    let url = "/api/v1/videos";
+    if (status && status !== "ALL") url += `?status=${status}`;
+    const res = await axiosClient.get<ApiResponse<VideoModerationItem[]>>(url);
+    return res.data.data || [];
   },
   reviewVideo: async (
     id: string,
@@ -116,7 +176,7 @@ export const adminApi = {
     reason?: string,
   ): Promise<void> => {
     await axiosClient.patch(
-      `/api/v1/videos/${id}/review?approved=${approved}&reason=${reason || ""}`,
+      `/api/v1/videos/${id}/review?approved=${approved}&reason=${encodeURIComponent(reason || "")}`,
     );
   },
 
@@ -159,6 +219,15 @@ export const adminApi = {
   deleteLesson: async (id: string): Promise<void> => {
     await axiosClient.delete(`/api/curriculum/lessons/${id}`);
   },
+  deleteDocument: async (documentId: string): Promise<void> => {
+    await axiosClient.delete(`/api/curriculum/documents/${documentId}`);
+  },
+  deleteVocabulary: async (vocabularyId: string): Promise<void> => {
+    await axiosClient.delete(`/api/curriculum/vocabularies/${vocabularyId}`);
+  },
+  deleteGrammarTopic: async (topicId: string): Promise<void> => {
+    await axiosClient.delete(`/api/curriculum/grammar/${topicId}`);
+  },
   getLessonDetail: async (lessonId: string): Promise<any> => {
     const res = await axiosClient.get(`/api/curriculum/lessons/${lessonId}`);
     return res.data.data;
@@ -171,12 +240,16 @@ export const adminApi = {
   // ==========================================
   // --- AI COST & TOKEN MONITORING ---
   // ==========================================
-  getAiUsageStats: async (): Promise<any> => {
-    const res = await axiosClient.get("/api/v1/admin/ai-monitoring/stats");
+  getAiUsageStats: async (): Promise<AiStatsResponse> => {
+    const res = await axiosClient.get<ApiResponse<AiStatsResponse>>(
+      "/api/v1/admin/ai-monitoring/stats",
+    );
     return res.data.data;
   },
-  getAiUserQuotas: async (): Promise<any[]> => {
-    const res = await axiosClient.get("/api/v1/admin/ai-monitoring/quotas");
+  getAiUserQuotas: async (): Promise<StudentQuotaItem[]> => {
+    const res = await axiosClient.get<ApiResponse<StudentQuotaItem[]>>(
+      "/api/v1/admin/ai-monitoring/quotas",
+    );
     return res.data.data;
   },
   updateUserAiQuota: async (
@@ -188,6 +261,12 @@ export const adminApi = {
       dailyLimit,
       isBlocked,
     });
+  },
+  toggleAiKillSwitch: async (): Promise<boolean> => {
+    const res = await axiosClient.post<ApiResponse<boolean>>(
+      "/api/v1/admin/ai-monitoring/kill-switch/toggle",
+    );
+    return res.data.data;
   },
 
   // ==========================================

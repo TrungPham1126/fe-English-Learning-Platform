@@ -39,6 +39,12 @@ axiosClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Nếu gửi FormData (upload file/audio), xóa Content-Type để Axios/trình duyệt tự sinh multipart/form-data kèm boundary
+    if (config.data instanceof FormData && config.headers) {
+      delete config.headers["Content-Type"];
+    }
+
     return config;
   },
   (error) => Promise.reject(error),
